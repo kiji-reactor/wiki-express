@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<layout xmlns="http://www.wibidata.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.wibidata.com layout.xsd">
+  <name>revision</name>
+  <description>Revisions of Wikipedia pages.</description>
+  <!-- Wibi row keys are a hash of page title and the bytes of the revision's timestamp. -->
+  <hashRowKeys>true</hashRowKeys>
+  <families>
+
+    <family type="group" localityGroup="default">
+      <name>info</name>
+      <description>Basic data about the revision.</description>
+      <columns>
+
+        <column>
+          <name>meta_data</name>
+          <description>Revision meta-data.</description>
+          <schema type="class">com.wibidata.wikimedia.avro.RevMetaData</schema>
+        </column>
+
+        <column>
+          <name>editor_id</name>
+          <description>
+            Identifies the editor who made the revision.
+          </description>
+          <schema type="class">com.wibidata.wikimedia.avro.EditorId</schema>
+        </column>
+
+        <column>
+          <name>comment</name>
+          <description>
+            The comment given by the editor when submitting the revision.
+          </description>
+          <schema>"string"</schema>
+        </column>
+
+        <column>
+          <name>delta</name>
+          <description>
+            String encoding of the delta between raw before and after revision texts.
+          </description>
+          <schema type="class">"string"</schema>
+        </column>
+
+        <column>
+          <name>delta_no_templates</name>
+          <description>
+            String encoding of the delta between before and after revision texts, with the templates stript from them.
+          </description>
+          <schema type="class">"string"</schema>
+        </column>
+
+        <column>
+          <name>before_text</name>
+          <description>
+            The full text of the last revision.
+          </description>
+          <schema>"string"</schema>
+        </column>
+      </columns>
+    </family>
+
+    <family type="group" localityGroup="default">
+      <name renamedFrom="editMetrics">edit_metrics</name>
+      <description>Metrics about content changes made in revisions.</description>
+      <columns>
+
+        <column>
+          <name>delta</name>
+          <description>
+            Number of characters inserted, less number deleted,  in the revision.
+          </description>
+          <schema>"long"</schema>
+        </column>
+
+        <column>
+          <name renamedFrom="deltaNoTemplates">delta_no_templates</name>
+          <description>
+            Number of characters inserted in the revision, less number deleted, discounting changes
+            in templates.
+          </description>
+          <schema>"long"</schema>
+        </column>
+      </columns>
+    </family>
+
+    <family type="group" localityGroup="default">
+      <name>templates</name>
+      <description>Derived info about templates</description>
+      <columns>
+
+        <column>
+          <name>before_templates</name>
+          <description>Array of records for all templates found in beforeText.</description>
+          <schema type="class">com.wibidata.wikimedia.avro.TemplateRecordArray</schema>
+        </column>
+
+        <column>
+          <name>after_templates</name>
+          <description>Array of records for all templates found in afterText.</description>
+          <schema type="class">com.wibidata.wikimedia.avro.TemplateRecordArray</schema>
+        </column>
+      </columns>
+    </family>
+
+    <family type="group" localityGroup="default">
+      <name renamedFrom="revertType">revert_type</name>
+      <description>Flags about whether the revision reverted or was reverted by another revision.</description>
+      <columns>
+
+        <column>
+          <name renamedFrom="isReverting">is_reverting</name>
+          <description>If true, this revision restored the page to an earlier state.</description>
+          <schema>"boolean"</schema>
+        </column>
+
+        <column>
+          <name renamedFrom="isReverted">is_reverted</name>
+          <description>If true, this revision was later undone by a different revision.</description>
+          <schema>"boolean"</schema>
+        </column>
+      </columns>
+    </family>
+  </families>
+
+  <localityGroups>
+    <localityGroup>
+      <name>default</name>
+      <description/>
+      <inMemory>false</inMemory>
+      <maxVersions>infinity</maxVersions>
+      <ttlSeconds>infinity</ttlSeconds>
+      <compressionType>snappy</compressionType>
+    </localityGroup>
+  </localityGroups>
+</layout>

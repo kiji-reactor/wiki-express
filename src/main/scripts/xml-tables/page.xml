@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<layout xmlns="http://www.wibidata.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.wibidata.com layout.xsd">
+  <name>page</name>
+  <description>Wikipedia page info.</description>
+  <hashRowKeys>true</hashRowKeys>
+  <families>
+
+    <family type="group" localityGroup="default">
+      <name>info</name>
+      <description>Basic data about the page.</description>
+
+      <columns>
+        <column>
+          <name>page_title</name>
+          <description>Title of the page.</description>
+          <schema>"string"</schema>
+        </column>
+      </columns>
+    </family>
+
+    <family type="map" localityGroup="default">
+      <name>summary_rev_info</name>
+      <description>Information about each revision to the page, where revision IDs are qualifiers.</description>
+      <schema type="class">com.wibidata.wikimedia.avro.SummaryRevInfo</schema>
+    </family>
+
+    <family type="map" localityGroup="default">
+      <name>edit_metrics</name>
+      <description>Metrics on revisions made by the editor.</description>
+      <schema type="class">com.wibidata.wikimedia.avro.UserTableMetricRecord</schema>
+    </family>
+
+    <family type="group" localityGroup="only_need_one_copy">
+      <name>derived</name>
+      <description>The columns in our table that we only need one copy of a cell.</description>
+      <columns>
+
+        <column>
+          <name>recent_text</name>
+          <description>The most recent version of the page.</description>'
+          <schema>"string"</schema>
+        </column>
+
+        <column>
+          <name>categories</name>
+          <description>Categories associated with the page.</description>
+          <schema>"array"</schema>
+        </column>
+
+        <column>
+          <name>links</name>
+          <description>Titles of wikipages linked to.</description>
+          <schema>"string"</schema>
+        </column>
+
+        <column>
+          <name>reverted_edits</name>
+          <description>Edits to this page that have since been reverted.</description>
+          <schema>"array"</schema>
+        </column>
+
+        <column>
+          <name>reverting_edits</name>
+          <description>Edits to this page that are restoring it to a previous state.</description>
+          <schema>"array"</schema>
+        </column>
+      </columns>
+    </family>
+  
+  </families>
+  
+  <localityGroups>
+    <localityGroup>
+      <name>default</name>
+      <description/>
+      <inMemory>false</inMemory>
+      <maxVersions>infinity</maxVersions>
+      <ttlSeconds>infinity</ttlSeconds>
+      <compressionType>snappy</compressionType>
+    </localityGroup>
+
+    <localityGroup>
+      <name renamedFrom="onlyNeedOneCopy">only_need_one_copy</name>
+      <description/>
+      <inMemory>false</inMemory>
+      <maxVersions>1</maxVersions>
+      <ttlSeconds>infinity</ttlSeconds>
+      <compressionType>snappy</compressionType>
+    </localityGroup>
+
+  </localityGroups>
+</layout>

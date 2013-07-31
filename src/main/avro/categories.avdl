@@ -1,0 +1,11 @@
+@namespace("org.kiji.examples.wikimedia")
+protocol Categories {
+    /**
+    * A custom Avro record to hold complex types for the 'categories' column of the Wikimedia
+    * 'page' table. Specifically, categories are an array of strings.
+    */
+    record CategoriesRecord {
+        array<string> categories;
+    }
+    
+}

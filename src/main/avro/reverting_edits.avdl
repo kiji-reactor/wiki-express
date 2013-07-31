@@ -1,0 +1,11 @@
+@namespace("org.kiji.examples.wikimedia")
+protocol RevertingEdits {
+    /**
+    * A custom Avro record to hold complex types for the 'reverting_edits' column of the Wikimedia
+    * 'page' table. Specifically, reverting edits are an array of longs.
+    */
+    record RevertingEditsRecord {
+        array<long> reverting_edits;
+    }
+
+}

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<layout xmlns="http://www.wibidata.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.wibidata.com layout.xsd">
+
+  <name>user</name>
+  <description>Data on Wikipedia users and revisions they've made.</description>
+  <!-- Row keys will be a stringified version of our best ID for editors. -->
+  <!-- This identifier corresponds to the contents of column info:user. -->
+  <hashRowKeys>true</hashRowKeys>
+  <families>
+
+    <family type="group" localityGroup="default">
+      <name>info</name>
+      <description>Data on editors and revisions they've made.</description>
+      <columns>
+
+        <column>
+          <name>user</name>
+          <description>A friendly identifier for the user.</description>
+          <schema>"string"</schema>
+        </column>
+
+        <column>
+          <name>page_title</name>
+          <description>The title of a page revised by the editor.</description>
+          <schema>"string"</schema>
+        </column>
+
+         <column>
+          <name>user_type</name>
+          <description>The type of user: BOT, USER, or IP</description>
+          <schema>"string"</schema>
+        </column>
+
+        <column>
+          <name>total_edits</name>
+          <description>The total number of edits made by this user.</description>
+          <schema>"int"</schema>
+        </column>
+
+         <column>
+          <name>user_start_time</name>
+          <description>The time of the user's first edit.</description>
+          <schema>"long"</schema>
+        </column>
+      </columns>
+    </family>
+
+    <family type="map" localityGroup="default">
+      <name>edit_metrics</name>
+      <description>Metrics on revisions made by the editor.</description>
+      <schema type="class">com.wibidata.wikimedia.avro.UserTableMetricRecord</schema>
+    </family>
+
+    <family type="map" localityGroup="default">
+      <name>edit_metric_stats</name>
+      <description>Descriptive statistics relating to metrics computed on edits.</description>
+      <schema type="class">com.wibidata.wikimedia.avro.DescriptiveStatsRecord</schema>
+    </family>
+
+    <family type="group" localityGroup="default">
+      <name>time_series</name>
+      <description>Time series derived from the user edit_metrics.</description>
+      <columns>
+
+       <column>
+         <name>is_reverted</name>
+         <description>
+            Per bin, the number of edits a user has made that have been subsequently reverted.
+         </description>
+         <schema>"double"</schema>
+       </column>
+
+       <column>
+         <name>is_reverting</name>
+         <description>
+            Per bin, the number of edits a user has made that have reverted an earlier edit.
+         </description>
+         <schema>"double"</schema>
+       </column>
+
+       <column>
+         <name>is_only_in_templates</name>
+         <description>
+            Per bin, the number of edits a user has made that only add or remove templates.
+         </description>
+         <schema>"double"</schema>
+       </column>
+
+       <column>
+         <name>delta_no_templates</name>
+          <description>
+            Per bin, the summed delta (charsAdded-charsDeleted) a user has made, discounting characters
+            added in templates.
+          </description>
+         <schema>"double"</schema>
+       </column>
+
+       <column>
+         <name>delta_new_content</name>
+          <description>
+            Per bin, the summed delta (charsAdded-charsDeleted) a user has made from edits that are 
+            neither reverted or reverting, discounting characters added in templates.
+          </description>
+         <schema>"double"</schema>
+       </column>
+
+       <column>
+         <name>total_edits</name>
+         <description>Per bin, the total number of edits made by a user.</description>
+         <schema>"double"</schema>
+       </column>
+
+       <column>
+         <name>total_non_revert_edits</name>
+         <description>Per bin, the total number of edits made by a user that were neither reverted or reverting.
+         </description>
+         <schema>"double"</schema>
+       </column>
+      </columns>
+    </family>
+  </families>
+
+  <localityGroups>
+    <localityGroup>
+      <name>default</name>
+      <description/>
+      <inMemory>false</inMemory>
+      <maxVersions>infinity</maxVersions>
+      <ttlSeconds>infinity</ttlSeconds>
+      <compressionType>snappy</compressionType>
+    </localityGroup>
+  </localityGroups>
+</layout>
