@@ -1,0 +1,162 @@
+/*
+   The raw JSON view of table layouts is intended for use by
+   system administrators or for debugging purposes.
+
+   Most users should use the 'kiji-schema-shell' DDL tool to modify
+   your table layouts instead.
+*/
+{
+  "name" : "revision",
+  "description" : "Revisions of Wikipedia pages.",
+  "keys_format" : {
+    "org.kiji.schema.avro.RowKeyFormat2" : {
+      "encoding" : "FORMATTED",
+      "salt" : {
+        "suppress_key_materialization" : true
+      },
+      "components" : [ {
+        "name" : "key",
+        "type" : "STRING"
+      } ]
+    }
+  },
+  "locality_groups" : [ {
+    "id" : 1,
+    "name" : "default",
+    "in_memory" : false,
+    "max_versions" : 2147483647,
+    "ttl_seconds" : 2147483647,
+    "compression_type" : "GZ",
+    "families" : [ {
+      "id" : 1,
+      "name" : "info",
+      "description" : "Basic data about the revision.",
+      "columns" : [ {
+        "id" : 1,
+        "name" : "meta_data",
+        "description" : "Revision meta-data.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "CLASS",
+          "value" : "com.wibidata.wikimedia.avro.RevMetaData"
+        }
+      }, {
+        "id" : 2,
+        "name" : "editor_id",
+        "description" : "Identifies the editor who made the revision.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "CLASS",
+          "value" : "com.wibidata.wikimedia.avro.EditorId"
+        }
+      }, {
+        "id" : 3,
+        "name" : "comment",
+        "description" : "The comment given by the editor when submitting the              revision.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"string\""
+        }
+      }, {
+        "id" : 4,
+        "name" : "delta",
+        "description" : "String encoding of the delta between raw before and              after revision texts.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"string\""
+        }
+      }, {
+        "id" : 5,
+        "name" : "delta_no_templates",
+        "description" : "String encoding of the delta between before              and after revision texts, with the templates stripped from them.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"string\""
+        }
+      }, {
+        "id" : 6,
+        "name" : "before_text",
+        "description" : "The full text of the last revision.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"string\""
+        }
+      } ]
+    }, {
+      "id" : 2,
+      "name" : "edit_metrics",
+      "description" : "Metrics about content changes made in         revisions.",
+      "columns" : [ {
+        "id" : 1,
+        "name" : "delta",
+        "description" : "Number of characters inserted, less number deleted, in the             revision.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"long\""
+        }
+      }, {
+        "id" : 2,
+        "name" : "delta_no_templates",
+        "description" : "Number of characters inserted in the revision,              less number deleted, discounting changes in templates.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"long\""
+        }
+      } ]
+    }, {
+      "id" : 3,
+      "name" : "templates",
+      "description" : "Derived info about templates.",
+      "columns" : [ {
+        "id" : 1,
+        "name" : "before_templates",
+        "description" : "Array of records for all templates found in beforeText.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "CLASS",
+          "value" : "com.wibidata.wikimedia.avro.TemplateRecordArray"
+        }
+      }, {
+        "id" : 2,
+        "name" : "after_templates",
+        "description" : "Array of records for all templates found in afterText.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "CLASS",
+          "value" : "com.wibidata.wikimedia.avro.TemplateRecordArray"
+        }
+      } ]
+    }, {
+      "id" : 4,
+      "name" : "revert_type",
+      "description" : "Flags about whether the revision reverted or          was reverted by another revision.",
+      "columns" : [ {
+        "id" : 1,
+        "name" : "is_reverting",
+        "description" : "If true, this revision restored the page to an              earlier state.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"boolean\""
+        }
+      }, {
+        "id" : 2,
+        "name" : "is_reverted",
+        "description" : "If true, this revision was later undone by a              different revision.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"boolean\""
+        }
+      } ]
+    } ]
+  } ],
+  "version" : "layout-1.1",
+  "layout_id" : "1"
+}

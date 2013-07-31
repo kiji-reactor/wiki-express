@@ -1,0 +1,170 @@
+/*
+   The raw JSON view of table layouts is intended for use by
+   system administrators or for debugging purposes.
+
+   Most users should use the 'kiji-schema-shell' DDL tool to modify
+   your table layouts instead.
+*/
+{
+  "name" : "user",
+  "description" : "Data on Wikipedia users and revisions they've made.",
+  "keys_format" : {
+    "org.kiji.schema.avro.RowKeyFormat2" : {
+      "encoding" : "FORMATTED",
+      "salt" : {
+        "suppress_key_materialization" : true
+      },
+      "components" : [ {
+        "name" : "key",
+        "type" : "STRING"
+      } ]
+    }
+  },
+  "locality_groups" : [ {
+    "id" : 1,
+    "name" : "default",
+    "in_memory" : false,
+    "max_versions" : 2147483647,
+    "ttl_seconds" : 2147483647,
+    "compression_type" : "GZ",
+    "families" : [ {
+      "id" : 1,
+      "name" : "info",
+      "description" : "Data on editors and revisions they've made.",
+      "columns" : [ {
+        "id" : 1,
+        "name" : "user",
+        "description" : "A friendly identifier for the user.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"string\""
+        }
+      }, {
+        "id" : 2,
+        "name" : "page_title",
+        "description" : "The title of a page revised by the editor.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"string\""
+        }
+      }, {
+        "id" : 3,
+        "name" : "user_type",
+        "description" : "The type of user: BOT, USER, or IP.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"string\""
+        }
+      }, {
+        "id" : 4,
+        "name" : "total_edits",
+        "description" : "The total number of edits made by this user.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"int\""
+        }
+      }, {
+        "id" : 5,
+        "name" : "user_start_time",
+        "description" : "The time of the user's first edit.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"long\""
+        }
+      } ]
+    }, {
+      "id" : 2,
+      "name" : "edit_metrics",
+      "description" : "Metrics on revisions made by the editor.",
+      "map_schema" : {
+        "storage" : "UID",
+        "type" : "CLASS",
+        "value" : "com.wibidata.wikimedia.avro.UserTableMetricRecord"
+      }
+    }, {
+      "id" : 3,
+      "name" : "edit_metric_stats",
+      "description" : "Descriptive          statistics relating to metrics computed on edits.",
+      "map_schema" : {
+        "storage" : "UID",
+        "type" : "CLASS",
+        "value" : "com.wibidata.wikimedia.avro.DescriptiveStatsRecord"
+      }
+    }, {
+      "id" : 4,
+      "name" : "time_series",
+      "description" : "Time series derived from the user          edit_metrics.",
+      "columns" : [ {
+        "id" : 1,
+        "name" : "is_reverted",
+        "description" : "Per bin, the number of edits a user has made that              have been subsequently reverted.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"double\""
+        }
+      }, {
+        "id" : 2,
+        "name" : "is_reverting",
+        "description" : "Per bin, the number of edits a user has made that              have reverted an earlier edit.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"double\""
+        }
+      }, {
+        "id" : 3,
+        "name" : "is_only_in_templates",
+        "description" : "Per bin, the number of edits a user has              made that only add or remove templates.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"double\""
+        }
+      }, {
+        "id" : 4,
+        "name" : "delta_no_templates",
+        "description" : "Per bin, the summed delta              (charsAdded-charsDeleted) a user has made, discounting characters added in templates.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"double\""
+        }
+      }, {
+        "id" : 5,
+        "name" : "delta_new_content",
+        "description" : "Per bin, the summed delta              (charsAdded-charsDeleted) a user has made from edits that are neither reverted or              reverting, discounting characters added in templates.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"double\""
+        }
+      }, {
+        "id" : 6,
+        "name" : "total_edits",
+        "description" : "Per bin, the total number of edits made by a user.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"double\""
+        }
+      }, {
+        "id" : 7,
+        "name" : "total_non_revert_edits",
+        "description" : "Per bin, the total number of edits made              by a user that were neither reverted or reverting.",
+        "column_schema" : {
+          "storage" : "UID",
+          "type" : "INLINE",
+          "value" : "\"double\""
+        }
+      } ]
+    } ]
+  } ],
+  "version" : "layout-1.1",
+  "layout_id" : "1"
+}
