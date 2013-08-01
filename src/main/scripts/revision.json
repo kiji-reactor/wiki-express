@@ -12,7 +12,7 @@
     "org.kiji.schema.avro.RowKeyFormat2" : {
       "encoding" : "FORMATTED",
       "salt" : {
-        "suppress_key_materialization" : true
+        "hash_size" : 2
       },
       "components" : [ {
         "name" : "key",
@@ -26,6 +26,7 @@
     "in_memory" : false,
     "max_versions" : 2147483647,
     "ttl_seconds" : 2147483647,
+    "bloom_type" : "NONE",
     "compression_type" : "GZ",
     "families" : [ {
       "id" : 1,
@@ -52,7 +53,7 @@
       }, {
         "id" : 3,
         "name" : "comment",
-        "description" : "The comment given by the editor when submitting the              revision.",
+        "description" : "The comment given by the editor when submitting the             revision.",
         "column_schema" : {
           "storage" : "UID",
           "type" : "INLINE",
@@ -61,7 +62,7 @@
       }, {
         "id" : 4,
         "name" : "delta",
-        "description" : "String encoding of the delta between raw before and              after revision texts.",
+        "description" : "String encoding of the delta between raw before and             after revision texts.",
         "column_schema" : {
           "storage" : "UID",
           "type" : "INLINE",
@@ -70,7 +71,7 @@
       }, {
         "id" : 5,
         "name" : "delta_no_templates",
-        "description" : "String encoding of the delta between before              and after revision texts, with the templates stripped from them.",
+        "description" : "String encoding of the delta between before             and after revision texts, with the templates stripped from them.",
         "column_schema" : {
           "storage" : "UID",
           "type" : "INLINE",
@@ -102,7 +103,7 @@
       }, {
         "id" : 2,
         "name" : "delta_no_templates",
-        "description" : "Number of characters inserted in the revision,              less number deleted, discounting changes in templates.",
+        "description" : "Number of characters inserted in the revision,             less number deleted, discounting changes in templates.",
         "column_schema" : {
           "storage" : "UID",
           "type" : "INLINE",
@@ -135,11 +136,11 @@
     }, {
       "id" : 4,
       "name" : "revert_type",
-      "description" : "Flags about whether the revision reverted or          was reverted by another revision.",
+      "description" : "Flags about whether the revision reverted or         was reverted by another revision.",
       "columns" : [ {
         "id" : 1,
         "name" : "is_reverting",
-        "description" : "If true, this revision restored the page to an              earlier state.",
+        "description" : "If true, this revision restored the page to an             earlier state.",
         "column_schema" : {
           "storage" : "UID",
           "type" : "INLINE",
@@ -148,7 +149,7 @@
       }, {
         "id" : 2,
         "name" : "is_reverted",
-        "description" : "If true, this revision was later undone by a              different revision.",
+        "description" : "If true, this revision was later undone by a             different revision.",
         "column_schema" : {
           "storage" : "UID",
           "type" : "INLINE",
@@ -157,6 +158,6 @@
       } ]
     } ]
   } ],
-  "version" : "layout-1.1",
+  "version" : "layout-1.2",
   "layout_id" : "1"
 }

@@ -1,5 +1,5 @@
 CREATE TABLE user WITH DESCRIPTION 'Data on Wikipedia users and revisions they\'ve made.'
-ROW KEY FORMAT HASHED
+ROW KEY FORMAT HASH PREFIXED(2)
 WITH LOCALITY GROUP default (
     MAXVERSIONS = infinity,
     TTL = infinity,

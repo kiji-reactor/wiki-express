@@ -1,5 +1,5 @@
 CREATE TABLE page WITH DESCRIPTION 'Wikipedia page info.'
-ROW KEY FORMAT HASHED
+ROW KEY FORMAT HASH PREFIXED(2)
 WITH LOCALITY GROUP default (
     MAXVERSIONS = infinity,
     TTL = infinity,
