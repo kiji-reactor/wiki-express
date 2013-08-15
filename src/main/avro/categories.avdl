@@ -1,4 +1,4 @@
-@namespace("org.kiji.examples.wikimedia")
+@namespace("org.kiji.express.wikimedia")
 protocol Categories {
     /**
     * A custom Avro record to hold complex types for the 'categories' column of the Wikimedia

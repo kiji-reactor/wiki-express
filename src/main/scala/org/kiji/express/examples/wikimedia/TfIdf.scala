@@ -19,19 +19,23 @@
 
 package org.kiji.express.examples.wikimedia
 
-import scala.collection.JavaConverters._
-
 import chalk.text.tokenize.SimpleEnglishTokenizer
 import chalk.text.transform._
+import scala.collection.JavaConversions._
+import scala.io.Source
 import com.twitter.scalding._
 import com.twitter.scalding.mathematics.Matrix._
-import com.google.common.collect.Lists
 
-import org.kiji.express._
-import org.kiji.express.KijiJob
-import org.kiji.express.DSL._
-import scala.collection.parallel.mutable
-import scala.collection
+import com.wibidata.wikimedia.avro.RevMetaData
+
+import org.kiji.express.KijiSlice
+import org.kiji.express.flow.all
+import org.kiji.express.flow.Column
+import org.kiji.express.flow.KijiInput
+import org.kiji.express.flow.KijiJob
+import org.kiji.express.wikimedia.util.RevisionDelta
+import org.kiji.express.wikimedia.util.RevisionDelta.Operation
+import org.kiji.express.wikimedia.util.RevisionDelta.Operation.Operator
 
 /**
  * Calculate the term frequency (tf) and inverse document frequency (idf) of each unique
@@ -54,17 +58,19 @@ class TfIdf(args: Args) extends KijiJob(args) {
    *     from the Scalding flow.
    * @return a sequence of strings, each representing a raw reverted edit.
    */
-  def filterForReverted(fields): Seq[String] = {
-    val revisionSeq: Seq[String] = fields._1.cells
-    val isRevertedSeq: Seq[Boolean] = fields._2.cells
+  def filterForReverted(fields: Tuple2[Seq[String], Seq[Boolean]]): Seq[String] = {
+    val revisionSeq: Seq[String] = fields._1
+    val isRevertedSeq: Seq[Boolean] = fields._2
     val toFilter: Seq[(String, Boolean)] = revisionSeq.zip(isRevertedSeq)
 
-    toFilter.map {
+    toFilter.flatMap {
       x: (String, Boolean) => {
         val revision = x._1
         val isReverted = x._2
-        if (isReverted) {
-          revision
+        if (isReverted == true) {
+          Some(revision)
+        } else {
+          None
         }
       }
     }
@@ -82,21 +88,25 @@ class TfIdf(args: Args) extends KijiJob(args) {
     // Get the raw text of insertions and deletions, and combine them into one string.
     var rawText = ""
     rawText += {
-      delta.foreach { op =>
+      val iter = delta.iterator()
+      iter.flatMap { op: Operation =>
         if (Operator.INSERT == op.getOperator) {
-          op.getText
-        }
-        else if (Operator.DELETE == op.getOperator) {
-          op.getOperand
+          Some(op.getText)
+        } else if (Operator.DELETE == op.getOperator) {
+          Some(op.getOperand)
+        } else {
+          None
         }
       }
     }
 
     // Parse text with Chalk (formerly Breeze) and pass to a sequence with each item
     // representing one word in the edit.
-    val iter = new SimpleEnglishTokenizer(rawText)
-    val filteredIter: Iterable[String] = iter.filter(new StopWordFilter("en"))
-    filteredIter.toSeq()
+    val tokenizer = SimpleEnglishTokenizer()
+    val iter: Iterable[String] = tokenizer(rawText)
+    val stopWordFilter = StopWordFilter("en")
+    val filteredIter: Iterable[String] = stopWordFilter(iter)
+    filteredIter.toSeq
   }
 
   /**
@@ -108,8 +118,7 @@ class TfIdf(args: Args) extends KijiJob(args) {
    * @return a sequence of page id's.
    */
   def getPageIds(slice: KijiSlice[RevMetaData]): Seq[Long] = {
-    //TODO figure out how to import Avro type com.wibidata.wikimedia.avro.RevMetaData
-    slice.cells.map { cell => cell.datum.getPageId }
+    slice.cells.map { cell => cell.datum.getPageId.asInstanceOf[Long] }
   }
 
   /**
@@ -122,7 +131,9 @@ class TfIdf(args: Args) extends KijiJob(args) {
    * the given word occurs in this document.
    */
   def countWordInDoc(document: List[String]): Seq[(String, Double)] = {
-    document.groupBy(x => x).mapValues(x => x.length).toSeq()
+    document.groupBy(x => x)
+        .mapValues(x => x.length.toDouble)
+        .map { case (k, v) => (k, v) }(collection.breakOut): Seq[(String, Double)]
   }
 
   /**
@@ -131,7 +142,7 @@ class TfIdf(args: Args) extends KijiJob(args) {
    * @param x is the number used to compute log_2(x).
    * @return the result of the logarithm operation.
    */
-  def log2(x: Double) = scala.math.log(x)/scala.math.log(2.0)
+  def log2(x: Double): Double = scala.math.log(x)/scala.math.log(2.0)
 
   /**
    * This Scalding pipeline does the following:
@@ -152,26 +163,34 @@ class TfIdf(args: Args) extends KijiJob(args) {
       .mapTo('revertedEdit -> 'edit) { tokenizeWords } // Each 'edit is of type Seq[String].
       .flatMapTo('metadata -> 'pageId) { getPageIds }
       .groupBy('pageId) { _.toList[Seq[String]]('edit -> 'page) }
-      .map('page -> 'page) { _.flatten }
+      .flatMap('page -> 'page) { x: String => x }
       .flatMap('page -> 'tfTuple) { countWordInDoc }
-      .map('tfTuple -> ('word, 'tfCount)) { x => (x._1, x._2) }
+      .map('tfTuple -> ('word, 'tfCount)) { x: (String, Double) => (x._1, x._2) }
 
   // Create a document-to-word matrix where m[i, j] = term frequency of word j in document i.
   // Based on the Scalding example MatrixTutorial6.
   val tfMatrix = pageDocs.toMatrix[Long, String, Double]('pageId, 'word, 'tfCount)
 
   // Compute the inverse document frequency (idf) for each word (row).
-  val dfVector = tfMatrix.binarizeAs[Double].sumRowVectors()
-  val totalDocs = dfVector.size // Needed to calculate idf.
-  val idfVector = dfVector.toMatrix(1).mapValues( x => log2(totalDocs / x) ).getRow(1)
-  val idfMatrix = tfMatrix.zip(idfVector).mapValues( pair => pair._2 )
+  val dfVector = tfMatrix.binarizeAs[Double]
+      .sumRowVectors
+  dfVector.toMatrix(1)
+      .pipeAs('pageId, 'df, 'value)
+      .groupAll { _.size }
+      .write(Tsv(args("totalDocsSize")))
+  val totalDocsSize: Double = Source.fromFile("totalDocsSize").getLines.mkString.toDouble
+  val idfVector = dfVector.toMatrix(1)
+      .mapValues( x => log2(totalDocsSize / x) )
+      .getRow(1)
+  val idfMatrix = tfMatrix.zip(idfVector)
+      .mapValues( pair => pair._2 )
 
   // Compute tf-idf for each word in the matrix.
   val tfIdfMatrix = tfMatrix.hProd(idfMatrix)
 
   // Sum the tf-idf scores for a given word across all documents (a 'word feature vector')
   // and output the top 10 words.
-  val tfIdfWordVector = tfIdfMatrix.sumColVectors()
+  val tfIdfWordVector = tfIdfMatrix.sumColVectors
   tfIdfWordVector.toMatrix(1)
       .topRowElems(10)
       .pipe

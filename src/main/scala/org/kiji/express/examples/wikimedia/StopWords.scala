@@ -21,13 +21,18 @@ package org.kiji.express.examples.wikimedia
 
 import chalk.text.tokenize.SimpleEnglishTokenizer
 import chalk.text.transform._
+import scala.collection.JavaConversions._
 import com.twitter.scalding._
-import com.wibidata.wikimedia.util.RevisionDelta
-import com.wibidata.wikimedia.util.RevisionDelta.Operation.Operator
 
-import org.kiji.express._
-import org.kiji.express.KijiJob
-import org.kiji.express.DSL._
+import org.kiji.express.Cell
+import org.kiji.express.KijiSlice
+import org.kiji.express.flow.all
+import org.kiji.express.flow.Column
+import org.kiji.express.flow.KijiInput
+import org.kiji.express.flow.KijiJob
+import org.kiji.express.wikimedia.util.RevisionDelta
+import org.kiji.express.wikimedia.util.RevisionDelta.Operation
+import org.kiji.express.wikimedia.util.RevisionDelta.Operation.Operator
 
 /**
  * Count the number of times that each unique word appears in the corpus of reverted edits in
@@ -57,13 +62,16 @@ class StopWords(args: Args) extends KijiJob(args) {
    *     from the Scalding flow.
    * @return a sequence of Kiji slices containing the revision if it is a reverted edit.
    */
-  def filterForReverted(fields): Seq[KijiSlice[String]] = {
+  def filterForReverted(fields: Tuple2[KijiSlice[String], KijiSlice[Boolean]]):
+      Seq[KijiSlice[String]] = {
     val revision: KijiSlice[String] = fields._1
     val isRevertedSlice: KijiSlice[Boolean] = fields._2
-    isRevertedSlice.cells.map {
-      isReverted: Boolean => {
-        if (isReverted) {
-          revision
+    isRevertedSlice.cells.flatMap {
+      isReverted: Cell[Boolean] => {
+        if (isReverted.datum == true) {
+          Some(revision)
+        } else {
+          None
         }
       }
     }
@@ -78,7 +86,7 @@ class StopWords(args: Args) extends KijiJob(args) {
    */
   def tokenizeWords(slice: KijiSlice[String]): Seq[String] = {
     slice.cells.flatMap {
-      cell => {
+      cell: Cell[String] => {
         // Get the content of each reverted edit.
         val stringDelta = cell.datum
         val delta = new RevisionDelta(stringDelta)
@@ -86,20 +94,25 @@ class StopWords(args: Args) extends KijiJob(args) {
         // Get the raw text of insertions and deletions, and combine them into one string.
         var rawText = ""
         rawText += {
-          delta.foreach { op =>
+          val iter = delta.iterator()
+          iter.flatMap { op: Operation =>
             if (Operator.INSERT == op.getOperator) {
-              op.getText
-            }
-            else if (Operator.DELETE == op.getOperator) {
-              op.getOperand
+              Some(op.getText)
+            } else if (Operator.DELETE == op.getOperator) {
+              Some(op.getOperand)
+            } else {
+              None
             }
           }
         }
 
-        // Parse text with Chalk (formerly Breeze) and pass to Seq.
-        val iter = new SimpleEnglishTokenizer(rawText)
-        val filteredIter = iter.filter(new StopWordFilter("en"))
-        filteredIter.toSeq()
+        // Parse text with Chalk (formerly Breeze) and pass to a sequence with each item
+        // representing one word in the edit.
+        val tokenizer = SimpleEnglishTokenizer()
+        val iter: Iterable[String] = tokenizer(rawText)
+        val stopWordFilter = StopWordFilter("en")
+        val filteredIter: Iterable[String] = stopWordFilter(iter)
+        filteredIter.toSeq
       }
     }
   }

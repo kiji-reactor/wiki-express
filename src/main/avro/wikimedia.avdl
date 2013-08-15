@@ -1,0 +1,171 @@
+// (c) Copyright 2012 Wibidata, Inc.
+
+// Avro schema definitions for data extracted from Wikimedia dumps.
+
+@namespace("com.wibidata.wikimedia.avro")
+protocol WikimediaRecords {
+
+  /** Basic meta-data about a revision. */
+  @aliases(["com.odiago.wikimedia.avro.RevMetaData"])
+  record RevMetaData {
+    /** Unique identifier for this revision. */
+     long id;
+
+     /** Unique identifier of the page revised. */
+     long pageId;
+
+     /** Title of the page revised. */
+     string  pageTitle;
+
+     /** The timestamp of the revision. */
+     long timestamp;
+
+     /** True if the revision was marked as minor. */
+     boolean isMinor;
+  }
+
+  /** Record for values output from PageTableGatherer. */
+  @aliases(["com.odiago.wikimedia.avro.PagePivotValues"])
+  record PagePivotValues {
+    /** MD5 hash of the after text of the revision. */
+    string afterTextHash;
+
+    /** Timestamp of revision. */
+    long timestamp;
+
+    /** Unique ID for the revision. */
+    long revisionId;
+
+    /** The title of the page. */
+    string pageTitle;
+  }
+
+  /** A succinct way to summarize a revision. */
+  @aliases(["com.odiago.wikimedia.avro.SummaryRevInfo"])
+  record SummaryRevInfo {
+    /** MD5 hash of the after text of the revision. */
+    string afterTextHash;
+
+    /** Timestamp of revision. */
+    long timestamp;
+
+    /** Unique ID for the revision. */
+    long revisionId;
+  }
+
+  /** User table revision metric record. */
+  record UserTableMetricRecord {
+    /** The metric being written, should match the column name qualifier.*/
+    long delta;
+
+    /** The metric being written, should match the column name qualifier.*/
+    union {null, long} deltaNoTemplates;
+
+    /** True if this revision was later reverted.*/
+    boolean isReverted;
+
+    /** True if this revision reverts earlier revisions.*/
+    boolean isReverting;
+
+    /** True if the edit takes place entirely inside of templates. */
+    boolean isOnlyInTemplates;
+
+    /** Timestamp. */
+    long timestamp;
+
+    /** The unique revision ID. */
+    string revisionId;
+  }
+
+  /** Info about the templates contained in the whole page. */
+  @aliases(["com.odiago.wikimedia.avro.TemplateRecord"])
+  record TemplateRecord {
+    /** The text contained inside of an outermost pair of curly braces, inclusive. */
+    string  templateText;
+
+    /** The offset into the revision text where the template begins. */
+    long  startOffset;
+
+    /** The offset into the revision text of the last template character. */
+    long  endOffset;
+  }
+
+  /** Info about the templates contained in the whole page. */
+  @aliases(["com.odiago.wikimedia.avro.TemplateRecordArray"])
+  record TemplateRecordArray {
+    /** An array of all records for every template within the wiki page. */
+    array<TemplateRecord> recordArray;
+  }
+
+  @aliases(["com.odiago.wikimedia.avro.IdTypes"])
+  enum IdTypes {
+    UNAME, IP, UNKNOWN
+  }
+
+  enum RevertTypes {
+    REVERTING, REVERTED
+  }
+
+  /** Identifying data known for an editor. */
+  @aliases(["com.odiago.wikimedia.avro.EditorId"])
+  record EditorId {
+    /** The type of this identifier, user name, user ip, or unknown. */
+    IdTypes idType;
+
+    /** Username for registered contributor. */
+    union { null, string } username;
+
+    /** User ID (comes with username) of registered contributor. */
+    union { null, long } userId;
+
+    /** IP address of anonymous contributor. */
+    union { null, string } ip;
+  }
+
+  /** A backup record of one revision of an article. */
+  @aliases(["com.odiago.wikimedia.avro.PageRevision"])
+  record PageRevision {
+    /** Basic meta-data about a revision. */
+    RevMetaData metaData;
+
+    /** Identifying data known for the editor that last edited this article. */
+    EditorId editorId;
+
+    /** The full text of the last revision. */
+    string beforeText;
+
+    /** The full text of this revision. */
+    string afterText;
+
+    /** Delta applied to previous revision text to obtain this revision's text. */
+    string delta;
+
+    /** The comment given by the editor when submitting the revision. */
+    union { null, string } comment;
+  }
+
+  /** A record containing statistics about a set of metrics. */
+  record DescriptiveStatsRecord {
+    /** Total number of datums in set. */
+    union {double, null} size;
+
+    /** Mean value of data. */
+    union {double, null} mean;
+
+    /** Min value of data. */
+    union {double, null} min;
+
+    /** Max value of data. */
+    union {double, null} max;
+
+    /** Sum of data. */
+    union {double, null} total;
+
+    /** Variance of data. */
+    union {double, null} variance;
+
+    /** Sum of Squares of data. */
+    union {double, null} sumSq = 0.0;
+
+  }
+}

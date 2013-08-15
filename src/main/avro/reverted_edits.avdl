@@ -1,4 +1,4 @@
-@namespace("org.kiji.examples.wikimedia")
+@namespace("org.kiji.express.wikimedia")
 protocol RevertedEdits {
     /**
     * A custom Avro record to hold complex types for the 'reverted_edits' column of the Wikimedia

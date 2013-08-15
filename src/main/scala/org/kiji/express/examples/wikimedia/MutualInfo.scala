@@ -19,20 +19,23 @@
 
 package org.kiji.express.examples.wikimedia
 
-import scala.collection.JavaConverters._
-
 import cascading.pipe.joiner._
 import chalk.text.tokenize.SimpleEnglishTokenizer
 import chalk.text.transform._
+import scala.collection.JavaConversions._
 import com.twitter.scalding._
 import com.twitter.scalding.mathematics.Matrix._
-import com.google.common.collect.Lists
+import scala.io.Source
 
-import org.kiji.express._
-import org.kiji.express.KijiJob
-import org.kiji.express.DSL._
-import scala.collection.parallel.mutable
-import scala.collection
+import com.wibidata.wikimedia.avro.RevMetaData
+
+import org.kiji.express.KijiSlice
+import org.kiji.express.flow.all
+import org.kiji.express.flow.Column
+import org.kiji.express.flow.KijiInput
+import org.kiji.express.flow.KijiJob
+import org.kiji.express.wikimedia.util.RevisionDelta
+import org.kiji.express.wikimedia.util.RevisionDelta.Operation.Operator
 
 /**
  * Calculate the term frequency (tf) and inverse document frequency (idf) of each unique
@@ -55,17 +58,19 @@ class MutualInfo(args: Args) extends KijiJob(args) {
    *     from the Scalding flow.
    * @return a sequence of strings, each representing a raw reverted edit.
    */
-  def filterForReverted(fields): Seq[String] = {
-    val revisionSeq: Seq[String] = fields._1.cells
-    val isRevertedSeq: Seq[Boolean] = fields._2.cells
+  def filterForReverted(fields: Tuple2[Seq[String], Seq[Boolean]]): Seq[String] = {
+    val revisionSeq: Seq[String] = fields._1
+    val isRevertedSeq: Seq[Boolean] = fields._2
     val toFilter: Seq[(String, Boolean)] = revisionSeq.zip(isRevertedSeq)
 
-    toFilter.map {
+    toFilter.flatMap {
       x: (String, Boolean) => {
         val revision = x._1
         val isReverted = x._2
-        if (isReverted) {
-          revision
+        if (isReverted == true) { // TODO can isReverted be null (java Boolean obj)?
+          Some(revision)
+        } else {
+          None
         }
       }
     }
@@ -78,19 +83,21 @@ class MutualInfo(args: Args) extends KijiJob(args) {
    *     'isReverting fields from the Scalding flow.
    * @return a sequence of strings, each representing a raw unreverted edit.
    */
-  def filterForUnreverted(fields): Seq[String] = {
-    val revisionSeq: Seq[String] = fields._1.cells
-    val isRevertedSeq: Seq[Boolean] = fields._2.cells
-    val isRevertingSeq: Seq[Boolean] = fields._2.cells
+  def filterForUnreverted(fields: Tuple3[Seq[String], Seq[Boolean], Seq[Boolean]]): Seq[String] = {
+    val revisionSeq: Seq[String] = fields._1
+    val isRevertedSeq: Seq[Boolean] = fields._2
+    val isRevertingSeq: Seq[Boolean] = fields._3
     val toRemove: Seq[Boolean] = isRevertedSeq ++ isRevertingSeq // Union of sequences.
     val toFilter: Seq[(String, Boolean)] = revisionSeq.zip(toRemove)
 
-    toFilter.map {
+    toFilter.flatMap {
       x: (String, Boolean) => {
         val revision = x._1
         val toRemove = x._2
         if (!toRemove) {
-          revision
+          Some(revision)
+        } else {
+          None
         }
       }
     }
@@ -106,23 +113,27 @@ class MutualInfo(args: Args) extends KijiJob(args) {
     val delta = new RevisionDelta(stringDelta)
 
     // Get the raw text of insertions and deletions, and combine them into one string.
-    var rawText = ""
+    var rawText: String = ""
     rawText += {
-      delta.foreach { op =>
+      val iter = delta.iterator()
+      iter.flatMap { op =>
         if (Operator.INSERT == op.getOperator) {
-          op.getText
-        }
-        else if (Operator.DELETE == op.getOperator) {
-          op.getOperand
+          Some(op.getText)
+        } else if (Operator.DELETE == op.getOperator) {
+          Some(op.getOperand)
+        } else {
+          None
         }
       }
     }
 
     // Parse text with Chalk (formerly Breeze) and pass to a sequence with each item
     // representing one word in the edit.
-    val iter = new SimpleEnglishTokenizer(rawText)
-    val filteredIter: Iterable[String] = iter.filter(new StopWordFilter("en"))
-    filteredIter.toSeq()
+    val tokenizer = SimpleEnglishTokenizer()
+    val iter: Iterable[String] = tokenizer(rawText)
+    val stopWordFilter = StopWordFilter("en")
+    val filteredIter: Iterable[String] = stopWordFilter(iter)
+    filteredIter.toSeq
   }
 
   /**
@@ -134,8 +145,7 @@ class MutualInfo(args: Args) extends KijiJob(args) {
    * @return a sequence of page id's.
    */
   def getPageIds(slice: KijiSlice[RevMetaData]): Seq[Long] = {
-    //TODO figure out how to import Avro type com.wibidata.wikimedia.avro.RevMetaData
-    slice.cells.map { cell => cell.datum.getPageId }
+    slice.cells.map { cell => cell.datum.getPageId.asInstanceOf[Long] }
   }
 
   /**
@@ -148,7 +158,9 @@ class MutualInfo(args: Args) extends KijiJob(args) {
    * the given word occurs in this document.
    */
   def countWordInDoc(document: List[String]): Seq[(String, Double)] = {
-    document.groupBy(x => x).mapValues(x => x.length).toSeq()
+    document.groupBy(x => x)
+        .mapValues(x => x.length.toDouble)
+        .map { case (k, v) => (k, v) }(collection.breakOut): Seq[(String, Double)]
   }
 
   /**
@@ -157,7 +169,7 @@ class MutualInfo(args: Args) extends KijiJob(args) {
    * @param x is the number used to compute log_2(x).
    * @return the result of the logarithm operation.
    */
-  def log2(x: Double) = scala.math.log(x)/scala.math.log(2.0)
+  def log2(x: Double): Double = scala.math.log(x)/scala.math.log(2.0)
 
   /**
    * Calculate the mutual information of a word, given pre-calculated N-counts.
@@ -165,17 +177,16 @@ class MutualInfo(args: Args) extends KijiJob(args) {
    * Equation 131</a> from Manning, Raghavan, & Schutze's <emphasis>Introduction to
    * Information Retrieval</emphasis>.
    *
-   * @param fields is a tuple of size 6 containing the 'word, 'n11, 'n01, 'n10, 'n00, and 'totalN
+   * @param fields is a tuple of size 5 containing the 'n11, 'n01, 'n10, 'n00, and 'totalN
    *     fields from the Scalding flow.
    * @return a double representing a word's mutual information bits.
    */
-  def calculateMI(fields): Double = {
-    val word: String = fields._1
-    val n11: Double = fields._2
-    val n01 = fields._3
-    val n10 = fields._4
-    val n00 = fields._5
-    val totalN = fields._6
+  def calculateMI(fields: Tuple5[Double, Double, Double, Double, Double]): Double = {
+    val n11 = fields._1
+    val n01 = fields._2
+    val n10 = fields._3
+    val n00 = fields._4
+    val totalN = fields._5
 
     // Calculate each term of the MI equation.
     val t1 = (n11 / totalN) * log2( (totalN * n11) / ((n10 + n11) * (n01 + n11)) )
@@ -184,6 +195,7 @@ class MutualInfo(args: Args) extends KijiJob(args) {
     val t4 = (n00 / totalN) * log2( (totalN * n00) / ((n00 + n01) * (n00 + n10)) )
 
     val mutualInfo = t1 + t2 + t3 + t4
+    return mutualInfo
   }
   /**
    * This Scalding pipeline processes reverted edits by doing the following:
@@ -204,9 +216,9 @@ class MutualInfo(args: Args) extends KijiJob(args) {
       .mapTo('revertedEdit -> 'edit) { tokenizeWords } // Each 'edit is of type Seq[String].
       .flatMapTo('metadata -> 'pageId) { getPageIds }
       .groupBy('pageId) { _.toList[Seq[String]]('edit -> 'page) }
-      .map('page -> 'page) { _.flatten }
+      .flatMap('page -> 'page) { x: String => x }
       .flatMap('page -> 'tfTuple) { countWordInDoc }
-      .map('tfTuple -> ('word, 'tfCount)) { x => (x._1, x._2) }
+      .map('tfTuple -> ('word, 'tfCount)) { x: (String, Double) => (x._1, x._2) }
 
   /**
    * This Scalding pipeline processes unreverted edits by doing the following:
@@ -228,9 +240,9 @@ class MutualInfo(args: Args) extends KijiJob(args) {
       .mapTo('unrevertedEdit -> 'unrevEdit) { tokenizeWords } // Each 'edit is of type Seq[String].
       .flatMapTo('metadata -> 'pageId) { getPageIds }
       .groupBy('pageId) { _.toList[Seq[String]]('edit -> 'page) }
-      .map('page -> 'page) { _.flatten }
+      .flatMap('page -> 'page) { x: String => x }
       .flatMap('page -> 'tfTuple) { countWordInDoc }
-      .map('tfTuple -> ('word, 'tfCount)) { x => (x._1, x._2) }
+      .map('tfTuple -> ('word, 'tfCount)) { x: (String, Double) => (x._1, x._2) }
 
   // Creates document-to-word matrices for both reverted and unreverted edits, where
   // m[i, j] = term frequency of word j in document i.
@@ -243,20 +255,8 @@ class MutualInfo(args: Args) extends KijiJob(args) {
   val unrevCountMatrix = unrevTfMatrix.binarizeAs[Double]
 
   // Computes the document frequency (df) for each word in both corpora.
-  val revDfVector = revCountMatrix.sumRowVectors() // N_11 values.
-  val unrevDfVector = unrevCountMatrix.sumRowVectors() // N_10 values.
-
-  // N = total number of documents, independent of class.
-  // The size of each df vector is the number of total documents in that class.
-  val totalN = revDfVector.size + unrevDfVector.size
-
-  // Computes the number of documents that do _not_ contain a given word.
-  val invRevDfVector = revDfVector.toMatrix(1)
-      .mapRows { df => revDfVector.size - df }
-      .getRow(1) // N_01 values.
-  val invUnrevDfVector = unrevDfVector.toMatrix(1)
-      .mapRows { df => unrevDfVector.size - df}
-      .getRow(1) // N_00 values.
+  val revDfVector = revCountMatrix.sumRowVectors // N_11 values.
+  val unrevDfVector = unrevCountMatrix.sumRowVectors // N_10 values.
 
   // Join the N-count vectors for each class into two pipes by word.
   val revDfPipe = revDfVector.toMatrix(1)
@@ -273,7 +273,25 @@ class MutualInfo(args: Args) extends KijiJob(args) {
   val invUnrevDfPipe = invUnrevDfVector.toMatrix(1)
       .pipeAs('pageId, 'word, 'n00)
       .discard('pageId)
-  val unrevertedPipe = unrevDfVector.joinWithLarger('word -> 'word, invUnrevDfPipe)
+  val unrevertedPipe = unrevDfPipe.joinWithLarger('word -> 'word, invUnrevDfPipe)
+
+  // N = total number of documents, independent of class.
+  // The size of each df vector is the number of total documents in that class.
+  revDfPipe.groupAll { _.size }
+      .write(Tsv(args("revDfSize")))
+  val revDfSize: Double = Source.fromFile("revDfSize").getLines.mkString.toDouble
+  unrevDfPipe.groupAll { _.size }
+      .write(Tsv(args("unrevDfSize")))
+  val unrevDfSize: Double = Source.fromFile("unrevDfSize").getLines.mkString.toDouble
+  val totalN = revDfSize + unrevDfSize
+
+  // Computes the number of documents that do _not_ contain a given word.
+  val invRevDfVector = revDfVector.toMatrix(1)
+      .mapValues { df => revDfSize - df }
+      .getRow(1) // N_01 values.
+  val invUnrevDfVector = unrevDfVector.toMatrix(1)
+      .mapValues { df => unrevDfSize - df}
+      .getRow(1) // N_00 values.
 
   // Join the reverted-edit and unreverted-edit word pipes to combine all 4 N-counts,
   // then add the total document count (N) as a constant field.
@@ -282,11 +300,11 @@ class MutualInfo(args: Args) extends KijiJob(args) {
   mutualInfoPipe.insert('totalN, totalN)
 
   // Calculate the mutual information (MI) of each word, finally!
-  mutualInfoPipe.map(('word, 'n11, 'n01, 'n10, 'n00, 'totalN) -> 'mutualInfo) { calculateMI }
+  mutualInfoPipe.map(('n11, 'n01, 'n10, 'n00, 'totalN) -> 'mutualInfo) { calculateMI }
 
   // Output the top 10 words by highest MI.
   mutualInfoPipe.project('word, 'mutualInfo)
-      .map('mutualInfo -> 'sort) { x => x * (-1) }
+      .map('mutualInfo -> 'sort) { x: Long => x * (-1) }
       .groupAll { _.sortBy('sort) }
       .limit(10)
       .discard('sort)
