@@ -1,5 +1,5 @@
 CREATE TABLE revision WITH DESCRIPTION 'Revisions of Wikipedia pages.'
-ROW KEY FORMAT (revision_id LONG, timestamp LONG, HASH (THROUGH timestamp, SIZE=2))
+ROW KEY FORMAT HASH PREFIXED(2)
 WITH LOCALITY GROUP default (
     MAXVERSIONS = infinity,
     TTL = infinity,

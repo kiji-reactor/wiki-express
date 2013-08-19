@@ -14,9 +14,13 @@
       "salt" : {
         "hash_size" : 2
       },
+      "range_scan_start_index" : 2,
       "components" : [ {
-        "name" : "key",
-        "type" : "STRING"
+        "name" : "revision_id",
+        "type" : "LONG"
+      }, {
+        "name" : "timestamp",
+        "type" : "LONG"
       } ]
     }
   },
