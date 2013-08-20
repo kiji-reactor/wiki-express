@@ -41,12 +41,12 @@ class StopWordsSuite extends KijiSuite {
 
   // Create some test data for three reverted revisions.
   val text0 = "Testing testing 123! testing"
-  val text1 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
-      "wiki_critical_theory.txt").getLines().mkString
-  val text2 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
-      "wiki_meme.txt").getLines().mkString
-  val text3 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
-      "wiki_semiotics.txt").getLines().mkString
+//  val text1 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
+//      "wiki_critical_theory.txt").getLines().mkString
+//  val text2 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
+//      "wiki_meme.txt").getLines().mkString
+//  val text3 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
+//      "wiki_semiotics.txt").getLines().mkString
   val testInput =
       (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text0))) ::
