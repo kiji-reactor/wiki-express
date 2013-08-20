@@ -19,6 +19,11 @@
 
 package org.kiji.express.examples.wikimedia
 
+import java.io.File
+import java.io.InputStreamReader
+import java.io.PrintWriter
+import java.util.Scanner
+
 import scala.collection.mutable.Buffer
 
 import com.twitter.scalding._
@@ -31,87 +36,117 @@ import org.kiji.express.flow._
  */
 class StopWordsSuite extends KijiSuite {
 
-  // Get a Kiji to use for the test and record the Kiji URI of the users and songs tables we'll
+  // Make a Kiji table with the appropriate layout and get its URI.
   // test against.
-  val kiji = makeTestKiji("StopWordsSuite")
-  val revisionURI = kiji.getURI().toString + "/revision"
+  val tableLayout = layout("revision.json") // located in src/test/resources
+  val table = makeTestKijiTable(tableLayout, "stopwords")
+  val tableURI = table.getURI.toString
 
-  // Execute the DDL shell commands in music-schema.ddl to create the tables for the music
-  // tutorial.
-  executeDDLResource(kiji, "/home/lisa/src/wiki-express/src/test/resources/revision.ddl")
+  // Make a new testing table for EntityId's with only one component.
+//  val tableLayout = layout("revision_1eid.json") // located in src/test/resources
+//  val table = makeTestKijiTable(tableLayout, "stopwords")
+//  val tableURI = table.getURI.toString
 
-  // Create some test data for three reverted revisions.
-  val text1 = ;
-  val text2;
-  val text3;
+  // Create some test data of reverted revisions.
+  val text0 = "+Testing testing 123! testing"
+  val isr: InputStreamReader =
+      new InputStreamReader(ClassLoader.getSystemResourceAsStream("wiki_critical_theory.txt"))
+  val scanner = new Scanner(isr).useDelimiter("\\A")
+  val text1: String = scanner.next()
+
   val testInput =
-      (EntityId("123"),
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text0))) ::
+      (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text1))) ::
-      (EntityId("456"),
-          slice("info:delta_no_templates", (0L, text2))) ::
-      (EntityId("789"),
-          slice("info:delta_no_templates", (0L, text3))) ::
-      (EntityId("123"), slice("info:is_reverted", (0L, true))) ::
-      (EntityId("456"), slice("info:is_reverted", (0L, true))) ::
-      (EntityId("789"), slice("info:is_reverted", (0L, true))) ::
+      (EntityId(2L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(3L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(2L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(3L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      Nil
+  val testInput_oneCol =
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text0))) ::
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(2L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(3L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      Nil
+  val testInput_fullRow =
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text0))) ::
+      (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(1L, 123L), slice("info:comment", (0L, "testing"))) ::
       Nil
 
-  /**
-   * Validates the top next songs produces for the three songs used in the test input. The counts
-   * should be as follows.
-   *
-   * Played First     Played Second     Count
-   * song-0           song-0            1
-   * song-0           song-1            2
-   * song-0           song-2            0
-   * song-1           song-0            0
-   * song-1           song-1            0
-   * song-1           song-2            2
-   * song-2           song-0            0
-   * song-2           song-1            1
-   * song-2           song-2            0
-   *
-   * @param topNextSongs contains three tuples for three songs, each containing a record of the
-   *     top next songs played.
-   */
-  def validateTest(topNextSongs: Buffer[(EntityId, KijiSlice[AvroRecord])]) {
-    val topSongForEachSong = topNextSongs
-        .map { case(entityId, slice) =>
-            (entityId(0).toString, slice) }
-        .map { case(id, slice) => (id, slice.getFirstValue()("topSongs")) }
+  // Test input for EntityId's with only one component.
+  val testInput_1eid =
+    (EntityId(1L), slice("info:delta_no_templates", (0L, text0))) ::
+    (EntityId(1L), slice("revert_type:is_reverted", (0L, true))) ::
+    (EntityId(1L), slice("info:comment", (0L, "testing"))) ::
+    Nil
 
-    topSongForEachSong.foreach {
-      case ("song-0", topSongs) => {
-        assert(2 === topSongs.asList.size)
-        assert("song-1" === topSongs(0)("song_id").asString)
-        assert(2 === topSongs(0)("count").asLong)
-        assert("song-0" === topSongs(1)("song_id").asString)
-        assert(1 === topSongs(1)("count").asLong)
-      }
-      case ("song-1", topSongs) => {
-        assert(1 === topSongs.asList.size)
-        assert("song-2" === topSongs(0)("song_id").asString)
-        assert(2 === topSongs(0)("count").asLong)
-      }
-      case ("song-2", topSongs) => {
-        assert(1 === topSongs.asList.size)
-        assert("song-1" === topSongs(0)("song_id").asString)
-        assert(1 === topSongs(0)("count").asLong)
+  val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
+
+  /**
+   * Validates that the job can print out data after tokenization.
+   *
+   * @param tokenizedEdits A buffer of string sequences representing each tokenized word
+   *     in a given edit.
+   */
+  def validateTokenize(tokenizedEdits: Buffer[Seq[String]]) {
+    val outputFile: File = new File("/home/lisa/src/wiki-express/src/test/resources/" +
+        "StopWordsSuite_validateTokenize.txt")
+    val printer: PrintWriter = new PrintWriter(outputFile)
+    tokenizedEdits.map {
+      edit: Seq[String] => {
+        printer.println(edit.toString())
+        println(edit.toString())
       }
     }
+
   }
 
-  test("TopNextSongs computes how often one song is played after another (local).") {
-    val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
+  /**
+   * Validates that the job output is of the expected length.
+   *
+   * @param top10Words A buffer of two Scalding tuples representing the word and
+   *     word count for the top 10 most frequent words across all rows,
+   */
+  def validateOutput(top10Words: Buffer[(String, Double)]) {
+    val numLines = top10Words.toSeq.size
+    assert(10 === numLines, "Ten lines of word counts were expected.")
+    top10Words.map { x: (String, Double) => System.out.println(x) }
+  }
+
+  test("StopWords can output a list of tokenized edits from one column.") {
     JobTest(new StopWords(_))
-        .arg("revision-table", revisionURI)
-        .arg("jobOutput", outputPath)
-        .source(KijiInput(revisionURI)(Map(
-            Column("info:delta_no_templates", all) -> 'revision,
-            Column("revert_type:is_reverted", all) -> 'isReverted)),
-            testInput)
-        .sink(Tsv("jobOutput")) { validateTest }
+        .arg("revision-uri", tableURI)
+        .arg("output", outputPath)
+        .source(KijiInput(tableURI)(
+            "info:delta_no_templates" -> 'revision),
+            testInput_oneCol)
+        .sink(Tsv("output")) { validateTokenize }
         .run
         .finish
   }
+
+//  test("StopWords can output a file of the top 10 most frequent words.") {
+//    JobTest(new StopWords(_))
+//        .arg("revision-uri", tableURI)
+//        .arg("output", outputPath)
+//        .source(KijiInput(tableURI)(
+//            "info:delta_no_templates" -> 'revision,
+//            "revert_type:is_reverted" -> 'isReverted),
+//            testInput)
+//        .sink(Tsv("output")) { validateOutput }
+//        .run
+//        .finish
+//  }
+
 }
