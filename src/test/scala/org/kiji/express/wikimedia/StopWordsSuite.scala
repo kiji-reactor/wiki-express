@@ -20,6 +20,7 @@
 package org.kiji.express.examples.wikimedia
 
 import scala.collection.mutable.Buffer
+import scala.io.Source
 
 import com.twitter.scalding._
 
@@ -33,85 +34,63 @@ class StopWordsSuite extends KijiSuite {
 
   // Get a Kiji to use for the test and record the Kiji URI of the users and songs tables we'll
   // test against.
-  val kiji = makeTestKiji("StopWordsSuite")
-  val revisionURI = kiji.getURI().toString + "/revision"
+  val tableLayout = layout("revision.json") // located in src/test/resources
+  val table = makeTestKijiTable(tableLayout, "stopwords")
 
-  // Execute the DDL shell commands in music-schema.ddl to create the tables for the music
-  // tutorial.
-  executeDDLResource(kiji, "/home/lisa/src/wiki-express/src/test/resources/revision.ddl")
+  val tableURI = table.getURI.toString
 
   // Create some test data for three reverted revisions.
-  val text1 = ;
-  val text2;
-  val text3;
+  val text1 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
+      "wiki_critical_theory.txt").getLines().mkString
+  val text2 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
+      "wiki_meme.txt").getLines().mkString
+  val text3 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
+      "wiki_semiotics.txt").getLines().mkString
   val testInput =
-      (EntityId("123"),
+      (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text1))) ::
-      (EntityId("456"),
+      (EntityId(2L, 123L),
           slice("info:delta_no_templates", (0L, text2))) ::
-      (EntityId("789"),
+      (EntityId(3L, 123L),
           slice("info:delta_no_templates", (0L, text3))) ::
-      (EntityId("123"), slice("info:is_reverted", (0L, true))) ::
-      (EntityId("456"), slice("info:is_reverted", (0L, true))) ::
-      (EntityId("789"), slice("info:is_reverted", (0L, true))) ::
+//      (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+//      (EntityId(2L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+//      (EntityId(3L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
       Nil
 
   /**
-   * Validates the top next songs produces for the three songs used in the test input. The counts
-   * should be as follows.
+   * Validates that the job output is of the expected length.
    *
-   * Played First     Played Second     Count
-   * song-0           song-0            1
-   * song-0           song-1            2
-   * song-0           song-2            0
-   * song-1           song-0            0
-   * song-1           song-1            0
-   * song-1           song-2            2
-   * song-2           song-0            0
-   * song-2           song-1            1
-   * song-2           song-2            0
-   *
-   * @param topNextSongs contains three tuples for three songs, each containing a record of the
-   *     top next songs played.
+   * @param top10Words contains two tuples representing the word and word count for the top 10
+   *     most frequent words across all rows,
    */
-  def validateTest(topNextSongs: Buffer[(EntityId, KijiSlice[AvroRecord])]) {
-    val topSongForEachSong = topNextSongs
-        .map { case(entityId, slice) =>
-            (entityId(0).toString, slice) }
-        .map { case(id, slice) => (id, slice.getFirstValue()("topSongs")) }
-
-    topSongForEachSong.foreach {
-      case ("song-0", topSongs) => {
-        assert(2 === topSongs.asList.size)
-        assert("song-1" === topSongs(0)("song_id").asString)
-        assert(2 === topSongs(0)("count").asLong)
-        assert("song-0" === topSongs(1)("song_id").asString)
-        assert(1 === topSongs(1)("count").asLong)
-      }
-      case ("song-1", topSongs) => {
-        assert(1 === topSongs.asList.size)
-        assert("song-2" === topSongs(0)("song_id").asString)
-        assert(2 === topSongs(0)("count").asLong)
-      }
-      case ("song-2", topSongs) => {
-        assert(1 === topSongs.asList.size)
-        assert("song-1" === topSongs(0)("song_id").asString)
-        assert(1 === topSongs(0)("count").asLong)
-      }
-    }
+  def validateOutputLength(top10Words: Buffer[(String, Double)]) {
+    val numLines = top10Words.toSeq.size
+    assert(10 === numLines, "Ten lines of word counts were expected.")
   }
 
-  test("TopNextSongs computes how often one song is played after another (local).") {
-    val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
+  test("StopWords TESTING.") {
     JobTest(new StopWords(_))
-        .arg("revision-table", revisionURI)
-        .arg("jobOutput", outputPath)
-        .source(KijiInput(revisionURI)(Map(
-            Column("info:delta_no_templates", all) -> 'revision,
-            Column("revert_type:is_reverted", all) -> 'isReverted)),
-            testInput)
-        .sink(Tsv("jobOutput")) { validateTest }
+        .arg("revision-uri", tableURI)
+        .source(KijiInput(tableURI)(Map(
+        Column("info:delta_no_templates", all) -> 'revision)),
+        testInput)
+        .sink(Tsv("output")) { validateOutputLength }
         .run
         .finish
   }
+
+//  test("StopWords can output a file of the top 10 most frequent words.") {
+//    val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
+//    JobTest(new StopWords(_))
+//        .arg("revision-uri", tableURI)
+//        .arg("output", outputPath)
+//        .source(KijiInput(tableURI)(Map(
+//            Column("info:delta_no_templates", all) -> 'revision,
+//            Column("revert_type:is_reverted", all) -> 'isReverted)),
+//            testInput)
+//        .sink(Tsv("output")) { validateOutputLength }
+//        .run
+//        .finish
+//  }
 }

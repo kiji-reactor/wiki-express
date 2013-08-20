@@ -23,6 +23,7 @@ import chalk.text.tokenize.SimpleEnglishTokenizer
 import chalk.text.transform._
 import scala.collection.JavaConversions._
 import com.twitter.scalding._
+import com.twitter.scalding.mathematics.Matrix._
 
 import org.kiji.express.Cell
 import org.kiji.express.KijiSlice
@@ -117,18 +118,32 @@ class StopWords(args: Args) extends KijiJob(args) {
     }
   }
 
+  val testPipe = KijiInput(args("revision-uri"))(Map(
+      Column("info:delta_no_templates", all) -> 'revision))
+      .flatMapTo('revision -> 'word) { tokenizeWords }
+      .write(Tsv("output"))
+
   /**
    * This Scalding pipeline does the following:
-   * 1. Reads the column "info:delta_no_templates" from rows in a Kiji table.
+   * 1. Reads the columns "info:delta_no_templates" and "revert_type:is_reverted" from
+   *    a Kiji table.
    * 2. Tokenizes the text of each reverted edit into a list of words.
    * 3. Counts the number of times each word occurs, across all rows.
-   * 4. Writes each word and word count to a file in HDFS.
+   * 4. Converts the pipe to a matrix and limits to the 10 highest word counts.
+   * 5. Converts the matrix back to a pipe with the appropriate tuple field names.
+   * 6. Discards the constant 'count' field created by the prior matrix conversion.
+   * 7. Writes each of the top 10 words by word count to an output file in HDFS.
    */
-  KijiInput(args("revision-uri"))(Map(
-      Column("info:delta_no_templates", all) -> 'revision,
-      Column("revert_type:is_reverted", all) -> 'isReverted))
-      .flatMapTo(('revision, 'isReverted) -> 'revertedEdit ) { filterForReverted }
-      .flatMapTo('revertedEdit -> 'word) { tokenizeWords }
-      .groupBy('word) { _.size('wordCount) }
-      .write(Tsv(args("output")))
+//  val wordCountPipe = KijiInput(args("revision-uri"))(Map(
+//      Column("info:delta_no_templates", all) -> 'revision,
+//      Column("revert_type:is_reverted", all) -> 'isReverted))
+//      .flatMapTo(('revision, 'isReverted) -> 'revertedEdit ) { filterForReverted }
+//      .flatMapTo('revertedEdit -> 'word) { tokenizeWords }
+//      .groupBy('word) { _.size('wordCount) }
+//
+//  wordCountPipe.toMatrix[String, String, Double]("count", 'word, 'wordCount)
+//      .topRowElems(10)
+//      .pipeAs('count, 'word, 'wordCount)
+//      .discard('count)
+//      .write(Tsv(args("output")))
 }

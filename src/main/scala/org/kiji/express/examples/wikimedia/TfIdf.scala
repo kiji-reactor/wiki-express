@@ -48,6 +48,8 @@ import org.kiji.express.wikimedia.util.RevisionDelta.Operation.Operator
  * tf-idf algorithm. The tf-idf score for each song is written to the column
  * 'derived:tf_idf' of the revision table.
  *
+ * TODO: Write tests for this class before running it against the Wikimedia 'revision' table.
+ *
  *@param args passed from the command line.
  */
 class TfIdf(args: Args) extends KijiJob(args) {
@@ -178,7 +180,7 @@ class TfIdf(args: Args) extends KijiJob(args) {
       .pipeAs('pageId, 'df, 'value)
       .groupAll { _.size }
       .write(Tsv(args("totalDocsSize")))
-  val totalDocsSize: Double = Source.fromFile("totalDocsSize").getLines.mkString.toDouble
+  val totalDocsSize: Double = Source.fromFile("totalDocsSize").getLines().mkString.toDouble
   val idfVector = dfVector.toMatrix(1)
       .mapValues( x => log2(totalDocsSize / x) )
       .getRow(1)
