@@ -40,8 +40,7 @@ class StopWordsSuite extends KijiSuite {
   val tableURI = table.getURI.toString
 
   // Create some test data for three reverted revisions.
-  val text0 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/wiki_test.txt")
-      .getLines().mkString
+  val text0 = "Testing testing 123! testing"
   val text1 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
       "wiki_critical_theory.txt").getLines().mkString
   val text2 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
