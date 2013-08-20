@@ -39,14 +39,14 @@ import org.kiji.express.wikimedia.util.RevisionDelta.Operation.Operator
  * Count the number of times that each unique word appears in the corpus of reverted edits in
  * Wikipedia, excluding stopwords.
  *
- * This job accepts one command line argument, '--revision-table`, which should be set to the
+ * This job accepts one command line argument, '--revision-table', which should be set to the
  * Kiji URIs of the 'revision' table in Kiji. The text of each reverted edit (stored in column
  * 'info:delta_no_templates' of table 'revision') is used to compute the 100 most frequent
  * unique words across all reverted edits, excluding those words on the stopwords list.
  * These words are written to a tab-delimited file on HDFS, at the filepath given by the
  * argument '--output'.
  *
- * @param args passed in from the command line.
+ *@param args passed in from the command line.
  */
 class StopWords(args: Args) extends KijiJob(args) {
   // List of English stopwords borrowed from Lucene.

@@ -40,6 +40,8 @@ class StopWordsSuite extends KijiSuite {
   val tableURI = table.getURI.toString
 
   // Create some test data for three reverted revisions.
+  val text0 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/wiki_test.txt")
+      .getLines().mkString
   val text1 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
       "wiki_critical_theory.txt").getLines().mkString
   val text2 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
@@ -48,11 +50,13 @@ class StopWordsSuite extends KijiSuite {
       "wiki_semiotics.txt").getLines().mkString
   val testInput =
       (EntityId(1L, 123L),
-          slice("info:delta_no_templates", (0L, text1))) ::
-      (EntityId(2L, 123L),
-          slice("info:delta_no_templates", (0L, text2))) ::
-      (EntityId(3L, 123L),
-          slice("info:delta_no_templates", (0L, text3))) ::
+          slice("info:delta_no_templates", (0L, text0))) ::
+//      (EntityId(1L, 123L),
+//          slice("info:delta_no_templates", (0L, text1))) ::
+//      (EntityId(2L, 123L),
+//          slice("info:delta_no_templates", (0L, text2))) ::
+//      (EntityId(3L, 123L),
+//          slice("info:delta_no_templates", (0L, text3))) ::
 //      (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
 //      (EntityId(2L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
 //      (EntityId(3L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
