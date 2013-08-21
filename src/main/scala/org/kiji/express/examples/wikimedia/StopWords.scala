@@ -134,9 +134,10 @@ class StopWords(args: Args) extends KijiJob(args) {
    * 6. Discards the constant 'count' field created by the prior matrix conversion.
    * 7. Writes each of the top 10 words by word count to an output file in HDFS.
    */
-//  val wordCountPipe = KijiInput(args("revision-uri"))(Map(
-//      Column("info:delta_no_templates", all) -> 'revision,
-//      Column("revert_type:is_reverted", all) -> 'isReverted))
+//  val wordCountPipe = KijiInput(args("revision-uri"))(
+//      "info:delta_no_templates" -> 'revision,
+//      "info:comment" -> 'testing,
+//      "revert_type:is_reverted" -> 'isReverted)
 //      .flatMapTo(('revision, 'isReverted) -> 'revertedEdit ) { filterForReverted }
 //      .flatMapTo('revertedEdit -> 'word) { tokenizeWords }
 //      .groupBy('word) { _.size('wordCount) }

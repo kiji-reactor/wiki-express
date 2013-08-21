@@ -19,8 +19,10 @@
 
 package org.kiji.express.examples.wikimedia
 
+import java.io.InputStreamReader
+import java.util.Scanner
+
 import scala.collection.mutable.Buffer
-import scala.io.Source
 
 import com.twitter.scalding._
 
@@ -32,34 +34,61 @@ import org.kiji.express.flow._
  */
 class StopWordsSuite extends KijiSuite {
 
-  // Get a Kiji to use for the test and record the Kiji URI of the users and songs tables we'll
+  // Make a Kiji table with the appropriate layout and get its URI.
   // test against.
   val tableLayout = layout("revision.json") // located in src/test/resources
   val table = makeTestKijiTable(tableLayout, "stopwords")
-
   val tableURI = table.getURI.toString
 
-  // Create some test data for three reverted revisions.
+  // Make a new testing table for EntityId's with only one component.
+//  val tableLayout = layout("revision_1eid.json") // located in src/test/resources
+//  val table = makeTestKijiTable(tableLayout, "stopwords")
+//  val tableURI = table.getURI.toString
+
+  // Create some test data of reverted revisions.
   val text0 = "+Testing testing 123! testing"
-//  val text1 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
-//      "wiki_critical_theory.txt").getLines().mkString
-//  val text2 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
-//      "wiki_meme.txt").getLines().mkString
-//  val text3 = Source.fromFile("/home/lisa/src/wiki-express/src/test/resources/" +
-//      "wiki_semiotics.txt").getLines().mkString
+  val isr: InputStreamReader =
+      new InputStreamReader(ClassLoader.getSystemResourceAsStream("wiki_critical_theory.txt"))
+  val scanner = new Scanner(isr).useDelimiter("\\A")
+  val text1: String = scanner.next()
+
   val testInput =
       (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text0))) ::
-//      (EntityId(1L, 123L),
-//          slice("info:delta_no_templates", (0L, text1))) ::
-//      (EntityId(2L, 123L),
-//          slice("info:delta_no_templates", (0L, text2))) ::
-//      (EntityId(3L, 123L),
-//          slice("info:delta_no_templates", (0L, text3))) ::
-//      (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
-//      (EntityId(2L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
-//      (EntityId(3L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(2L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(3L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(2L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(3L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(10L, 123L), slice("info:comment", (0L, "testing"))) ::
       Nil
+  val testInput_oneCol =
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text0))) ::
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(2L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      (EntityId(3L, 123L),
+          slice("info:delta_no_templates", (0L, text1))) ::
+      Nil
+  val testInput_fullRow =
+      (EntityId(1L, 123L),
+          slice("info:delta_no_templates", (0L, text0))) ::
+      (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
+      (EntityId(1L, 123L), slice("info:comment", (0L, "testing"))) ::
+      Nil
+
+  // Test input for EntityId's with only one component.
+  val testInput_1eid =
+    (EntityId(1L), slice("info:delta_no_templates", (0L, text0))) ::
+    (EntityId(1L), slice("revert_type:is_reverted", (0L, true))) ::
+    (EntityId(1L), slice("info:comment", (0L, "testing"))) ::
+    Nil
 
   /**
    * Validates that the job output is of the expected length.
@@ -67,9 +96,10 @@ class StopWordsSuite extends KijiSuite {
    * @param top10Words contains two tuples representing the word and word count for the top 10
    *     most frequent words across all rows,
    */
-  def validateOutputLength(top10Words: Buffer[(String, Double)]) {
+  def validateOutput(top10Words: Buffer[(String, Double)]) {
     val numLines = top10Words.toSeq.size
     assert(10 === numLines, "Ten lines of word counts were expected.")
+    top10Words.map { x: (String, Double) => System.out.println(x) }
   }
 
   test("StopWords TESTING.") {
@@ -77,8 +107,8 @@ class StopWordsSuite extends KijiSuite {
         .arg("revision-uri", tableURI)
         .source(KijiInput(tableURI)(Map(
         Column("info:delta_no_templates", all) -> 'revision)),
-        testInput)
-        .sink(Tsv("output")) { validateOutputLength }
+        testInput_oneCol)
+        .sink(Tsv("output")) { validateOutput }
         .run
         .finish
   }
@@ -87,13 +117,15 @@ class StopWordsSuite extends KijiSuite {
 //    val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
 //    JobTest(new StopWords(_))
 //        .arg("revision-uri", tableURI)
-//        .arg("output", outputPath)
-//        .source(KijiInput(tableURI)(Map(
-//            Column("info:delta_no_templates", all) -> 'revision,
-//            Column("revert_type:is_reverted", all) -> 'isReverted)),
-//            testInput)
-//        .sink(Tsv("output")) { validateOutputLength }
+////        .arg("output", outputPath)
+//        .source(KijiInput(tableURI)(
+//            "info:delta_no_templates" -> 'revision,
+//            "info:comment" -> 'testing,
+//            "revert_type:is_reverted" -> 'isReverted),
+//            testInput_1eid)
+//        .sink(Tsv("output")) { validateOutput }
 //        .run
 //        .finish
 //  }
+
 }
