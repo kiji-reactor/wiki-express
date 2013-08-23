@@ -16,7 +16,7 @@
 
   <properties>
     <kiji.framework.version>1.1.2</kiji.framework.version>
-    <express.version>0.8.0</express.version>
+    <express.version>0.8.1</express.version>
     <scala.version>2.9.2</scala.version>
     <scalatest.version>2.0.M5b</scalatest.version>
     <scalding.version>0.8.3</scalding.version>
@@ -76,6 +76,13 @@
       <groupId>org.scalanlp</groupId>
       <artifactId>chalk</artifactId>
       <version>1.2.0</version>
+    </dependency>
+
+    <!-- OpenNLP -->
+    <dependency>
+      <groupId>org.apache.opennlp</groupId>
+      <artifactId>opennlp-tools</artifactId>
+      <version>1.5.3</version>
     </dependency>
 
     <!-- Testing -->
@@ -225,6 +232,13 @@
       <id>conjars.org</id>
       <url>http://conjars.org/repo</url>
     </repository>
+
+    <!-- OpenNLP -->
+    <repository>
+      <id>opennlp.sf.net</id>
+      <url>http://opennlp.sourceforge.net/maven2/</url>
+    </repository>
+
   </repositories>
 
   <scm>

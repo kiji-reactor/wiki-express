@@ -19,16 +19,18 @@
 
 package org.kiji.express.examples.wikimedia
 
-import chalk.text.tokenize.SimpleEnglishTokenizer
-import chalk.text.transform._
-import scala.collection.JavaConversions._
+import java.io.InputStream
+import java.io.IOException
+
 import com.twitter.scalding._
 import com.twitter.scalding.mathematics.Matrix._
+import opennlp.tools.tokenize.Tokenizer
+import opennlp.tools.tokenize.TokenizerModel
+import opennlp.tools.tokenize.TokenizerME
+import scala.collection.JavaConversions._
 
 import org.kiji.express.Cell
 import org.kiji.express.KijiSlice
-import org.kiji.express.flow.all
-import org.kiji.express.flow.Column
 import org.kiji.express.flow.KijiInput
 import org.kiji.express.flow.KijiJob
 import org.kiji.express.wikimedia.util.RevisionDelta
@@ -50,11 +52,28 @@ import org.kiji.express.wikimedia.util.RevisionDelta.Operation.Operator
  */
 class StopWords(args: Args) extends KijiJob(args) {
   // List of English stopwords borrowed from Lucene.
-  /* TODO remove if I don't end up using
-  val mStopwords = Set("a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
+  val mStopWords = Set("a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
       "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the",
       "their", "then", "there", "these", "they", "this", "to", "was", "will", "with")
-  */
+
+  /**
+   * Filters out a predetermined stopwords compilation, given an already tokenized
+   * string sequence,
+   *
+   * @param tokenized A tokenized string sequence.
+   * @return a string sequence without stopwords.
+   */
+  def removeStopWords(tokenized: Seq[String]): Seq[String] = {
+    tokenized.flatMap {
+      word: String => {
+        if (mStopWords.contains(word)) {
+          Some(word)
+        } else {
+          None
+        }
+      }
+    }
+  }
 
   /**
    * Gets the full text of all reverted edits made by a user.
@@ -88,11 +107,11 @@ class StopWords(args: Args) extends KijiJob(args) {
   def tokenizeWords(slice: KijiSlice[String]): Seq[String] = {
     slice.cells.flatMap {
       cell: Cell[String] => {
-        // Get the content of each reverted edit.
+        // Gets the content of each reverted edit.
         val stringDelta = cell.datum
         val delta = new RevisionDelta(stringDelta)
 
-        // Get the raw text of insertions and deletions, and combine them into one string.
+        // Gets the raw text of insertions and deletions, and combines them into one string.
         var rawText = ""
         rawText += {
           val iter = delta.iterator()
@@ -109,18 +128,44 @@ class StopWords(args: Args) extends KijiJob(args) {
 
         // Parse text with Chalk (formerly Breeze) and pass to a sequence with each item
         // representing one word in the edit.
-        val tokenizer = SimpleEnglishTokenizer()
-        val iter: Iterable[String] = tokenizer(rawText)
-        val stopWordFilter = StopWordFilter("en")
-        val filteredIter: Iterable[String] = stopWordFilter(iter)
-        filteredIter.toSeq
+        // Fails to find Scala.runtime.RichChar...
+//        val tokenizer = SimpleEnglishTokenizer()
+//        val iter: Iterable[String] = tokenizer(rawText)
+//        val stopWordFilter = StopWordFilter("en")
+//        val filteredIter: Iterable[String] = stopWordFilter(iter)
+//        filteredIter.toSeq
+
+        // Tokenizes the raw text using OpenNLP and return to the flatMap
+        // a sequence where each element is one word in the edit.
+        val modelIn: InputStream = getClass.getClassLoader
+            .getResourceAsStream("org/kiji/express/wikimedia/en-token.bin")
+        var tokenized: Seq[String] = Seq()
+        try {
+          val model: TokenizerModel = new TokenizerModel(modelIn)
+          val tokenizer: Tokenizer = new TokenizerME(model)
+          tokenized = tokenizer.tokenize(rawText).toSeq
+
+        } catch {
+          case e: IOException => e.printStackTrace()
+
+        } finally {
+          if (modelIn != null) {
+            try {
+              modelIn.close()
+            } catch {
+              case e: IOException => e.printStackTrace()
+            }
+          }
+        }
+
+        removeStopWords(tokenized)
       }
     }
   }
 
-  val testPipe = KijiInput(args("revision-uri"))(Map(
-      Column("info:delta_no_templates", all) -> 'revision))
-      .flatMapTo('revision -> 'word) { tokenizeWords }
+  val testTokenizedPipe = KijiInput(args("revision-uri"))(
+      "info:delta_no_templates" -> 'revision)
+      .mapTo('revision -> 'edit) { tokenizeWords } // Modified from flatMapTo for testing
       .write(Tsv("output"))
 
   /**
@@ -136,7 +181,6 @@ class StopWords(args: Args) extends KijiJob(args) {
    */
 //  val wordCountPipe = KijiInput(args("revision-uri"))(
 //      "info:delta_no_templates" -> 'revision,
-//      "info:comment" -> 'testing,
 //      "revert_type:is_reverted" -> 'isReverted)
 //      .flatMapTo(('revision, 'isReverted) -> 'revertedEdit ) { filterForReverted }
 //      .flatMapTo('revertedEdit -> 'word) { tokenizeWords }

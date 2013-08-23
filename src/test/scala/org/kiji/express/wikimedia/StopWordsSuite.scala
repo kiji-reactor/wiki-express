@@ -19,7 +19,9 @@
 
 package org.kiji.express.examples.wikimedia
 
+import java.io.File
 import java.io.InputStreamReader
+import java.io.PrintWriter
 import java.util.Scanner
 
 import scala.collection.mutable.Buffer
@@ -64,7 +66,6 @@ class StopWordsSuite extends KijiSuite {
       (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
       (EntityId(2L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
       (EntityId(3L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
-      (EntityId(10L, 123L), slice("info:comment", (0L, "testing"))) ::
       Nil
   val testInput_oneCol =
       (EntityId(1L, 123L),
@@ -90,11 +91,32 @@ class StopWordsSuite extends KijiSuite {
     (EntityId(1L), slice("info:comment", (0L, "testing"))) ::
     Nil
 
+  val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
+
+  /**
+   * Validates that the job can print out data after tokenization.
+   *
+   * @param tokenizedEdits A buffer of string sequences representing each tokenized word
+   *     in a given edit.
+   */
+  def validateTokenize(tokenizedEdits: Buffer[Seq[String]]) {
+    val outputFile: File = new File("/home/lisa/src/wiki-express/src/test/resources/" +
+        "StopWordsSuite_validateTokenize.txt")
+    val printer: PrintWriter = new PrintWriter(outputFile)
+    tokenizedEdits.map {
+      edit: Seq[String] => {
+        printer.println(edit.toString())
+        println(edit.toString())
+      }
+    }
+
+  }
+
   /**
    * Validates that the job output is of the expected length.
    *
-   * @param top10Words contains two tuples representing the word and word count for the top 10
-   *     most frequent words across all rows,
+   * @param top10Words A buffer of two Scalding tuples representing the word and
+   *     word count for the top 10 most frequent words across all rows,
    */
   def validateOutput(top10Words: Buffer[(String, Double)]) {
     val numLines = top10Words.toSeq.size
@@ -102,27 +124,26 @@ class StopWordsSuite extends KijiSuite {
     top10Words.map { x: (String, Double) => System.out.println(x) }
   }
 
-  test("StopWords TESTING.") {
+  test("StopWords can output a list of tokenized edits from one column.") {
     JobTest(new StopWords(_))
         .arg("revision-uri", tableURI)
-        .source(KijiInput(tableURI)(Map(
-        Column("info:delta_no_templates", all) -> 'revision)),
-        testInput_oneCol)
-        .sink(Tsv("output")) { validateOutput }
+        .arg("output", outputPath)
+        .source(KijiInput(tableURI)(
+            "info:delta_no_templates" -> 'revision),
+            testInput_oneCol)
+        .sink(Tsv("output")) { validateTokenize }
         .run
         .finish
   }
 
 //  test("StopWords can output a file of the top 10 most frequent words.") {
-//    val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
 //    JobTest(new StopWords(_))
 //        .arg("revision-uri", tableURI)
-////        .arg("output", outputPath)
+//        .arg("output", outputPath)
 //        .source(KijiInput(tableURI)(
 //            "info:delta_no_templates" -> 'revision,
-//            "info:comment" -> 'testing,
 //            "revert_type:is_reverted" -> 'isReverted),
-//            testInput_1eid)
+//            testInput)
 //        .sink(Tsv("output")) { validateOutput }
 //        .run
 //        .finish
