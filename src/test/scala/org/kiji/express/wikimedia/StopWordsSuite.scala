@@ -19,9 +19,7 @@
 
 package org.kiji.express.examples.wikimedia
 
-import java.io.File
 import java.io.InputStreamReader
-import java.io.PrintWriter
 import java.util.Scanner
 
 import scala.collection.mutable.Buffer
@@ -70,12 +68,10 @@ class StopWordsSuite extends KijiSuite {
   val testInput_oneCol =
       (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text0))) ::
-      (EntityId(1L, 123L),
-          slice("info:delta_no_templates", (0L, text1))) ::
       (EntityId(2L, 123L),
-          slice("info:delta_no_templates", (0L, text1))) ::
+          slice("info:delta_no_templates", (0L, text0))) ::
       (EntityId(3L, 123L),
-          slice("info:delta_no_templates", (0L, text1))) ::
+          slice("info:delta_no_templates", (0L, text0))) ::
       Nil
   val testInput_fullRow =
       (EntityId(1L, 123L),
@@ -100,13 +96,14 @@ class StopWordsSuite extends KijiSuite {
    *     in a given edit.
    */
   def validateTokenize(tokenizedEdits: Buffer[Seq[String]]) {
-    val outputFile: File = new File("/home/lisa/src/wiki-express/src/test/resources/" +
-        "StopWordsSuite_validateTokenize.txt")
-    val printer: PrintWriter = new PrintWriter(outputFile)
+    System.out.println("validating tokenize:")
     tokenizedEdits.map {
       edit: Seq[String] => {
-        printer.println(edit.toString())
-        println(edit.toString())
+        assert(edit(0) === "Testing")
+        assert(edit(1) === "testing")
+        assert(edit(2) === "123")
+        assert(edit(3) === "!")
+        assert(edit(4) === "testing")
       }
     }
 

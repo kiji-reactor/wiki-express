@@ -22,12 +22,13 @@ package org.kiji.express.examples.wikimedia
 import java.io.InputStream
 import java.io.IOException
 
+import scala.collection.JavaConversions._
+
 import com.twitter.scalding._
 import com.twitter.scalding.mathematics.Matrix._
 import opennlp.tools.tokenize.Tokenizer
 import opennlp.tools.tokenize.TokenizerModel
 import opennlp.tools.tokenize.TokenizerME
-import scala.collection.JavaConversions._
 
 import org.kiji.express.Cell
 import org.kiji.express.KijiSlice
@@ -67,9 +68,9 @@ class StopWords(args: Args) extends KijiJob(args) {
     tokenized.flatMap {
       word: String => {
         if (mStopWords.contains(word)) {
-          Some(word)
-        } else {
           None
+        } else {
+          Some(word)
         }
       }
     }
@@ -113,29 +114,16 @@ class StopWords(args: Args) extends KijiJob(args) {
 
         // Gets the raw text of insertions and deletions, and combines them into one string.
         var rawText = ""
-        rawText += {
-          val iter = delta.iterator()
-          iter.flatMap { op: Operation =>
-            if (Operator.INSERT == op.getOperator) {
-              Some(op.getText)
-            } else if (Operator.DELETE == op.getOperator) {
-              Some(op.getOperand)
-            } else {
-              None
-            }
+        val deltaIter = delta.iterator()
+        deltaIter.foreach { op: Operation =>
+          if (Operator.INSERT == op.getOperator) {
+            rawText += (op.getText + " ")
+          } else if (Operator.DELETE == op.getOperator) {
+            rawText += (op.getOperand + " ")
           }
         }
 
-        // Parse text with Chalk (formerly Breeze) and pass to a sequence with each item
-        // representing one word in the edit.
-        // Fails to find Scala.runtime.RichChar...
-//        val tokenizer = SimpleEnglishTokenizer()
-//        val iter: Iterable[String] = tokenizer(rawText)
-//        val stopWordFilter = StopWordFilter("en")
-//        val filteredIter: Iterable[String] = stopWordFilter(iter)
-//        filteredIter.toSeq
-
-        // Tokenizes the raw text using OpenNLP and return to the flatMap
+        // Tokenizes the raw text using OpenNLP and returns to the flatMap
         // a sequence where each element is one word in the edit.
         val modelIn: InputStream = getClass.getClassLoader
             .getResourceAsStream("org/kiji/express/wikimedia/en-token.bin")
@@ -144,10 +132,8 @@ class StopWords(args: Args) extends KijiJob(args) {
           val model: TokenizerModel = new TokenizerModel(modelIn)
           val tokenizer: Tokenizer = new TokenizerME(model)
           tokenized = tokenizer.tokenize(rawText).toSeq
-
         } catch {
           case e: IOException => e.printStackTrace()
-
         } finally {
           if (modelIn != null) {
             try {
@@ -158,7 +144,9 @@ class StopWords(args: Args) extends KijiJob(args) {
           }
         }
 
-        removeStopWords(tokenized)
+        val filtered: Seq[String] = removeStopWords(tokenized)
+        System.out.println("Filtered string: " + filtered.mkString(","))
+        filtered
       }
     }
   }

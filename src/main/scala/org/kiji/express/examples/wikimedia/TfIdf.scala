@@ -19,10 +19,15 @@
 
 package org.kiji.express.examples.wikimedia
 
-import chalk.text.tokenize.SimpleEnglishTokenizer
-import chalk.text.transform._
+import java.io.InputStream
+import java.io.IOException
+
 import scala.collection.JavaConversions._
 import scala.io.Source
+
+import opennlp.tools.tokenize.Tokenizer
+import opennlp.tools.tokenize.TokenizerME
+import opennlp.tools.tokenize.TokenizerModel
 import com.twitter.scalding._
 import com.twitter.scalding.mathematics.Matrix._
 
@@ -89,26 +94,37 @@ class TfIdf(args: Args) extends KijiJob(args) {
 
     // Get the raw text of insertions and deletions, and combine them into one string.
     var rawText = ""
-    rawText += {
-      val iter = delta.iterator()
-      iter.flatMap { op: Operation =>
-        if (Operator.INSERT == op.getOperator) {
-          Some(op.getText)
-        } else if (Operator.DELETE == op.getOperator) {
-          Some(op.getOperand)
-        } else {
-          None
+    val deltaIter = delta.iterator()
+    deltaIter.foreach { op: Operation =>
+      if (Operator.INSERT == op.getOperator) {
+        rawText += (op.getText + " ")
+      } else if (Operator.DELETE == op.getOperator) {
+        rawText += (op.getOperand + " ")
+      }
+    }
+
+    // Tokenizes the raw text using OpenNLP and returns to the flatMap
+    // a sequence where each element is one word in the edit.
+    val modelIn: InputStream = getClass.getClassLoader
+        .getResourceAsStream("org/kiji/express/wikimedia/en-token.bin")
+    var tokenized: Seq[String] = Seq()
+    try {
+      val model: TokenizerModel = new TokenizerModel(modelIn)
+      val tokenizer: Tokenizer = new TokenizerME(model)
+      tokenized = tokenizer.tokenize(rawText).toSeq
+    } catch {
+      case e: IOException => e.printStackTrace()
+    } finally {
+      if (modelIn != null) {
+        try {
+          modelIn.close()
+        } catch {
+          case e: IOException => e.printStackTrace()
         }
       }
     }
 
-    // Parse text with Chalk (formerly Breeze) and pass to a sequence with each item
-    // representing one word in the edit.
-    val tokenizer = SimpleEnglishTokenizer()
-    val iter: Iterable[String] = tokenizer(rawText)
-    val stopWordFilter = StopWordFilter("en")
-    val filteredIter: Iterable[String] = stopWordFilter(iter)
-    filteredIter.toSeq
+    tokenized
   }
 
   /**
