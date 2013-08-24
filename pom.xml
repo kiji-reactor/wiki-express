@@ -72,11 +72,11 @@
     </dependency>
 
     <!-- Breeze/Chalk -->
-    <dependency>
+    <!-- <dependency>
       <groupId>org.scalanlp</groupId>
       <artifactId>chalk</artifactId>
       <version>1.2.0</version>
-    </dependency>
+    </dependency> -->
 
     <!-- OpenNLP -->
     <dependency>

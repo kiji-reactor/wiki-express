@@ -52,6 +52,7 @@ class StopWordsSuite extends KijiSuite {
   val scanner = new Scanner(isr).useDelimiter("\\A")
   val text1: String = scanner.next()
 
+  // Test input for the full StopWords flow.
   val testInput =
       (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text0))) ::
@@ -65,6 +66,7 @@ class StopWordsSuite extends KijiSuite {
       (EntityId(2L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
       (EntityId(3L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
       Nil
+  // Test input providing data for only one column.
   val testInput_oneCol =
       (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text0))) ::
@@ -73,13 +75,13 @@ class StopWordsSuite extends KijiSuite {
       (EntityId(3L, 123L),
           slice("info:delta_no_templates", (0L, text0))) ::
       Nil
+  // Test input providing data across multiple columns but in a single row.
   val testInput_fullRow =
       (EntityId(1L, 123L),
           slice("info:delta_no_templates", (0L, text0))) ::
       (EntityId(1L, 123L), slice("revert_type:is_reverted", (0L, true))) ::
       (EntityId(1L, 123L), slice("info:comment", (0L, "testing"))) ::
       Nil
-
   // Test input for EntityId's with only one component.
   val testInput_1eid =
     (EntityId(1L), slice("info:delta_no_templates", (0L, text0))) ::
@@ -87,8 +89,11 @@ class StopWordsSuite extends KijiSuite {
     (EntityId(1L), slice("info:comment", (0L, "testing"))) ::
     Nil
 
-  val outputPath = "/home/lisa/src/wiki-express/src/test/resources/StopWordsSuiteOutput.txt"
+  // A dummy output file for test output
+  val outputFile = "outputFile"
 
+  // This test passed successfully and the caller job was modified to continue
+  // debugging further steps in the flow.
   /**
    * Validates that the job can print out data after tokenization.
    *
@@ -121,18 +126,21 @@ class StopWordsSuite extends KijiSuite {
     top10Words.map { x: (String, Double) => System.out.println(x) }
   }
 
-  test("StopWords can output a list of tokenized edits from one column.") {
+  //TODO continue debugging this test (no exception thrown but fails validateOutput)
+  test("StopWords can output a file of the top 10 most frequent words from all edits.") {
     JobTest(new StopWords(_))
         .arg("revision-uri", tableURI)
-        .arg("output", outputPath)
+        .arg("output", outputFile)
         .source(KijiInput(tableURI)(
             "info:delta_no_templates" -> 'revision),
             testInput_oneCol)
-        .sink(Tsv("output")) { validateTokenize }
+        .sink(Tsv(outputFile)) { validateOutput }
         .run
         .finish
   }
 
+  // TODO This test fails with an IndexOutOfBoundsException, which can be temporarily
+  // avoided by only passing one column as input to KijiInput.
 //  test("StopWords can output a file of the top 10 most frequent words.") {
 //    JobTest(new StopWords(_))
 //        .arg("revision-uri", tableURI)

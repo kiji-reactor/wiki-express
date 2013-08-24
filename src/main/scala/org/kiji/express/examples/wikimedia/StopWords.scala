@@ -52,7 +52,7 @@ import org.kiji.express.wikimedia.util.RevisionDelta.Operation.Operator
  *@param args passed in from the command line.
  */
 class StopWords(args: Args) extends KijiJob(args) {
-  // List of English stopwords borrowed from Lucene.
+  // List of English stopwords from Lucene.
   val mStopWords = Set("a", "an", "and", "are", "as", "at", "be", "but", "by", "for",
       "if", "in", "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the",
       "their", "then", "there", "these", "they", "this", "to", "was", "will", "with")
@@ -151,10 +151,17 @@ class StopWords(args: Args) extends KijiJob(args) {
     }
   }
 
-  val testTokenizedPipe = KijiInput(args("revision-uri"))(
+  val testPipe = KijiInput(args("revision-uri"))(
       "info:delta_no_templates" -> 'revision)
-      .mapTo('revision -> 'edit) { tokenizeWords } // Modified from flatMapTo for testing
-      .write(Tsv("output"))
+      .flatMapTo('revision -> 'word) { tokenizeWords }
+      .groupBy('word) { _.size('wordCount) }
+      .insert('count, "count")
+
+  testPipe.toMatrix[String, String, Double]('count, 'word, 'wordCount)
+      .topRowElems(10)
+      .pipeAs('count, 'word, 'wordCount)
+      .discard('count)
+      .write(Tsv(args("output")))
 
   /**
    * This Scalding pipeline does the following:
@@ -173,8 +180,9 @@ class StopWords(args: Args) extends KijiJob(args) {
 //      .flatMapTo(('revision, 'isReverted) -> 'revertedEdit ) { filterForReverted }
 //      .flatMapTo('revertedEdit -> 'word) { tokenizeWords }
 //      .groupBy('word) { _.size('wordCount) }
+//      .insert('count, "count")
 //
-//  wordCountPipe.toMatrix[String, String, Double]("count", 'word, 'wordCount)
+//  wordCountPipe.toMatrix[String, String, Double]('count, 'word, 'wordCount)
 //      .topRowElems(10)
 //      .pipeAs('count, 'word, 'wordCount)
 //      .discard('count)
